@@ -44,7 +44,8 @@ saveRDS(nominal, "data/nominal.rds")
 download.file("https://www.federalreserve.gov/data/yield-curve-tables/feds200805.csv",
               "data/feds200805.csv")
 
-tips <- read.csv("data/feds200805.csv", skip = 9, na.strings = c("NA", "-999.99"))
+# NOTE: the TIPS file has 18 description lines before the table (the nominal one had 9).
+tips <- read.csv("data/feds200805.csv", skip = 18, na.strings = c("NA", "-999.99"))
 
 tips$date  <- as.Date(tips$Date)
 tips$y5f10 <- (15 * tips$TIPSY15 - 5 * tips$TIPSY05) / 10
