@@ -1,31 +1,36 @@
 # R/ — data pipeline
 
-## Files
-- `fetch_data.R` — pulls every public input from its exact primary source and
-  stores it R-natively under `data/raw/` and `data/derived/`. Also builds the
-  5-year-forward 10-year (`5f10y`) series for the nominal and TIPS curves.
+Read [`../DATA_CHECKLIST.md`](../DATA_CHECKLIST.md) first: it lists every input
+and the cleanest way to get each.
+
+## Setup (once)
+```r
+install.packages(c("fredr", "readr", "dplyr", "lubridate", "dataverse"))
+```
+Put your FRED key in `~/.Renviron` (then restart R):
+```
+FRED_API_KEY=your_key_here
+```
+
+## Scripts
+| Script | Does |
+|---|---|
+| `fetch_data.R` | **Groups 1–2**: pulls FRED (GDP, TREAST, FDHBFIN) via `fredr`, downloads the GSW nominal + TIPS curves from the **correct** Fed Board URLs, builds the `5f10y` series, saves R-native `.rds`. Failures print loudly; a summary prints at the end. |
+| `check_data.R` | Integrity report: PASS/FAIL/MISSING per input, date coverage, the Jan 5→6 2021 event-study values, and an explicit "failed to extract" list. |
+| `load_fred_manual.R` | Fallback only — ingest hand-downloaded FRED CSVs if `fredr` is unavailable. |
 
 ## Run
 ```r
-install.packages(c("readr", "dplyr", "lubridate"))
 Rscript R/fetch_data.R
+Rscript R/check_data.R
 ```
 
-## Why the data isn't already in this repo
-This repo was assembled in a sandbox whose network policy blocks every economic-
-data host (federalreserve.gov, fred.stlouisfed.org, bea.gov, cbo.gov,
-dataverse.harvard.edu) — only GitHub and package registries were reachable. The
-script therefore could not be executed there. Run it locally, or in an
-environment that allows those hosts, and `data/` populates end-to-end. Full
-provenance, access status, and the walled items are documented in
-[`../DATA_SOURCES.md`](../DATA_SOURCES.md).
+## Not covered by the scripts (one manual fetch each — see checklist)
+- **DKW output** (#6) — the r*/term-premium file from the "Tips from TIPS" FEDS Note.
+- **PRZ deposit** (#8) — paste the Harvard Dataverse DOI and it wires into `dataverse::get_dataframe_by_name`.
+- **PTR** (#9) — FRB/US package zip.
 
-## Output layout
-```
-data/
-  raw/       gsw_nominal.rds, gsw_tips.rds, controls_fred.rds
-  derived/   nominal_5f10y.rds, tips_5f10y.rds
-```
-Items requiring hand-collection or author correspondence (DKW output, PTR, CBO
-vintages, PredictIt, Hazell–Hobler cross-section) are flagged as explicit stubs
-inside `fetch_data.R` rather than silently omitted.
+## Why the earlier all-NULL run
+The GSW URL path was dead (`/econres/feds/files/…`). Corrected here to
+`/data/yield-curve-tables/…`. That, plus using `fredr` for FRED instead of a
+raw `read_csv(url)`, is what makes this run cleanly.
