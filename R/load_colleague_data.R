@@ -37,7 +37,10 @@ prz_table3 <- prz[, c("date",
                       "fed_gdp",       # Federal Reserve Treasury holdings (% GDP)
                       "foreign_gdp",   # foreign OFFICIAL holdings (% GDP)
                       "frbus_pi_y10",  # 10-year expected inflation (PTR)
-                      "acm_tp_y10")]   # NY Fed ACM 10y term premium (validates our ACM)
+                      "acm_tp_y10",    # NY Fed ACM 10y term premium (validates our ACM)
+                      "i5y5y_zc",         # PRZ's own tenor (5f5 nominal yield)
+                      "dkw_rshort_y5y5",  # DKW real short rate at 5f5 (public decomposition)
+                      "dkw_rtp_y5y5")]    # DKW real term premium at 5f5 (public decomposition)
 
 saveRDS(prz_table3, "data/prz_table3.rds")
 
