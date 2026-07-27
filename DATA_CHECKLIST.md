@@ -7,6 +7,30 @@ Legend: ✅ automatable & confirmed · ⚠️ automatable, one caveat · ✋ man
 
 ---
 
+## STATUS after fact-checking the colleague delivery
+
+Verified real and folded in (`R/load_colleague_data.R`):
+- **DKW output** (`DKW_updates.csv`) — genuine Fed release. Reproduces Table 1's
+  **10-year** columns to 2 decimals. Horizons present: **5y, 10y, 5f5**.
+- **PRZ deposit** (`Data.xlsx`, sheet `final`) — the entire Table 3 right-hand
+  side (`debt_y5`, `fed_gdp`, `foreign_gdp`, `frbus_pi_y10`), semiannual
+  1976–2025. Removes the CBO hand-collection **and** settles the foreign-official
+  caveat (`foreign_gdp` is the real official series, not FDHBFIN).
+- **FRB/US package** — real; PTR + nominal GDP. Now a backup (PTR is in PRZ).
+
+Discarded: `predictit_illustrative.csv` — honestly labelled but interpolated
+(14/18 days). **Not usable for any reported estimate.** PredictIt stays a wall.
+
+**The one gap this exposed (headline):** the DKW public file stops at 10y + 5f5,
+so the paper's preferred **5-year-forward 10-year (5f10y) r\*/term-premium**
+decomposition is **not** in any public file — it is the authors' walled
+extension. Fix: **run ACM on the GSW 5/10/15y TIPS curve** to produce the 5f10y
+real term premium and r\* (this is Novelty 5; PRZ's own workbook carries `acm_*`
+columns as precedent). Until then, the 10-year decomposition is fully replicable
+and the 5f10y row is the substitution.
+
+---
+
 ## Group 1 — FRED, via `fredr` + your API key ✅
 
 One-time: `install.packages("fredr")`; put `FRED_API_KEY=xxxx` in `~/.Renviron`.
