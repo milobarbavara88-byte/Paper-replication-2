@@ -36,7 +36,8 @@ prz_table3 <- prz[, c("date",
                       "debt_y5",       # CBO 5-year-ahead debt projection (% GDP)
                       "fed_gdp",       # Federal Reserve Treasury holdings (% GDP)
                       "foreign_gdp",   # foreign OFFICIAL holdings (% GDP)
-                      "frbus_pi_y10")] # 10-year expected inflation (PTR)
+                      "frbus_pi_y10",  # 10-year expected inflation (PTR)
+                      "acm_tp_y10")]   # NY Fed ACM 10y term premium (validates our ACM)
 
 saveRDS(prz_table3, "data/prz_table3.rds")
 
