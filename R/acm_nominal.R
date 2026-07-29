@@ -21,7 +21,9 @@
 # ===========================================================================
 
 nom <- readRDS("data/nominal.rds")
-nom <- nom[!is.na(nom$BETA0), ]            # need the Svensson parameters
+# need ALL six Svensson parameters present (early rows pre-~1980 are missing some,
+# which would make the yield grid NA and break the PCA)
+nom <- nom[complete.cases(nom[, c("BETA0","BETA1","BETA2","BETA3","TAU1","TAU2")]), ]
 nom$date <- as.Date(nom$Date)
 
 # ---- Step 1: a yield at any maturity, from the Svensson parameters ---------
@@ -48,6 +50,8 @@ ym       <- format(nom$date, "%Y-%m")
 last_row <- tapply(seq_len(nrow(nom)), ym, max)      # last obs each month
 mon      <- nom[sort(as.integer(last_row)), ]
 Y        <- yield_grid(mon)                # T x 180, per-month decimal
+keep     <- apply(is.finite(Y), 1, all)    # drop any month with a non-finite yield
+Y <- Y[keep, ];  mon <- mon[keep, ]
 cat("Step 2: monthly obs =", nrow(Y), " maturities =", ncol(Y), "\n")
 
 pca  <- prcomp(Y, center = TRUE, scale. = FALSE)
@@ -125,8 +129,10 @@ decomp_5f10 <- function(Xf) {
 acm_m <- cbind(date = mon$date, decomp_5f10(X))
 # ... and a DAILY series (for the Table 1 event study + bootstrap)
 Yday  <- yield_grid(nom)
+okday <- apply(is.finite(Yday), 1, all)    # same finite-row guard for the daily grid
+Yday  <- Yday[okday, ];  nomd <- nom[okday, ]
 Xday  <- sweep(Yday, 2, ybar) %*% W
-acm_d <- cbind(date = nom$date, decomp_5f10(Xday))
+acm_d <- cbind(date = nomd$date, decomp_5f10(Xday))
 saveRDS(acm_d, "data/acm_5f10_nominal.rds")
 saveRDS(acm_m, "data/acm_5f10_nominal_monthly.rds")
 
