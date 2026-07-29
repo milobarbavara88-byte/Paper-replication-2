@@ -66,8 +66,8 @@ cat(sprintf("%-26s %8s  %6s %6s | %9s %9s\n",
 for (nm in names(series)) {
   s <- series[[nm]];  r <- boot_p(s[[1]], s[[2]])
   cat(sprintf("%-26s %8.2f  %6.3f %6.3f | %9.3f %9.3f\n",
-              nm, r["actual"] * 100, r["p_one.one"], r["p_two.two"],
-              r["pX_one.one"], r["pX_two.two"]))
+              nm, r["actual"] * 100, r["p_one"], r["p_two"],
+              r["pX_one"], r["pX_two"]))
 }
 
 cat("\nNotes: p_1sd/p_2sd = one- and two-sided (the paper's asterisks fit either;",
