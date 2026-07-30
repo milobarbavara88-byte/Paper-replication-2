@@ -280,3 +280,35 @@ cat(sprintf("Table 3 debt    : %.2f / 3.95 (paper window)\n", coef(m1)["d_debt"]
 cat(sprintf("ACM validation  : corr with NY Fed 10y term premium = %.3f\n", acm_corr))
 cat("Walls (data access, not replicable): Table 2 (PredictIt), intraday window\n")
 cat("===========================================================\n")
+
+# ===========================================================================
+# 9. FIGURES (written to figures/ for the write-up)
+# ---------------------------------------------------------------------------
+# To resize: change width/height/res here, and out.width in the .Rmd chunk.
+# ===========================================================================
+dir.create("figures", showWarnings = FALSE)
+
+# our ACM 10-year term premium against the New York Fed's published series
+vv <- v[order(v$date), ]
+png("figures/acm_validation.png", width = 1800, height = 1050, res = 220)
+plot(vv$date, vv$nyfed, type = "l", lwd = 2, col = "grey45",
+     xlab = "", ylab = "10-year term premium (%)",
+     main = sprintf("Our ACM estimate vs. New York Fed  (correlation %.3f)", acm_corr))
+lines(vv$date, vv$ours, lwd = 2, col = "firebrick")
+legend("topright", c("New York Fed ACM", "Our ACM"),
+       col = c("grey45", "firebrick"), lwd = 2, bty = "n")
+dev.off()
+
+# the placebo null: ordinary-day moves in the 10-year real term premium, with
+# the January 6 2021 move marked
+chp  <- changes(dkw$date, dkw$real.term.prem.10)
+pool <- chp$chg[chp$date >= as.Date("2016-01-01") & chp$date <= as.Date("2021-01-04")]
+pool <- pool[is.finite(pool)]
+png("figures/placebo_null.png", width = 1800, height = 1050, res = 220)
+hist(pool * 100, breaks = 60, col = "grey85", border = "grey65",
+     xlab = "one-day change in the 10-year real term premium (bp)",
+     ylab = "placebo days, 2016-2021", main = "")
+abline(v = chp$chg[chp$date == d6] * 100, lwd = 2, col = "firebrick")
+text(chp$chg[chp$date == d6] * 100, par("usr")[4] * 0.92,
+     "January 6, 2021", col = "firebrick", pos = 4)
+dev.off()
