@@ -40,7 +40,10 @@ prz_table3 <- prz[, c("date",
                       "acm_tp_y10",    # NY Fed ACM 10y term premium (validates our ACM)
                       "i5y5y_zc",         # PRZ's own tenor (5f5 nominal yield)
                       "dkw_rshort_y5y5",  # DKW real short rate at 5f5 (public decomposition)
-                      "dkw_rtp_y5y5")]    # DKW real term premium at 5f5 (public decomposition)
+                      "dkw_rtp_y5y5",     # DKW real term premium at 5f5 (public decomposition)
+                      "dkw_epi_y5y5",     # DKW expected inflation at 5f5 (Novelty 2)
+                      "dkw_pirp_y5y5",    # DKW inflation risk premium at 5f5 (Novelty 2)
+                      "dkw_ifit_y5y5")]   # DKW nominal fitted yield at 5f5 (Novelty 2 sum check)
 
 saveRDS(prz_table3, "data/prz_table3.rds")
 
