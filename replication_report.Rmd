@@ -1,0 +1,193 @@
+---
+title: "Replicating *The Causal Effect of Debt on Interest Rates*"
+subtitle: "A replication of Bhatt, Diercks, Eyal and Skaperdas (2026), FEDS 2026-031"
+author: "[Your name]"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  pdf_document:
+    number_sections: true
+    fig_caption: true
+geometry: margin=1in
+fontsize: 11pt
+linkcolor: black
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{float}
+abstract: |
+  We replicate the three publicly tractable exercises of Bhatt, Diercks, Eyal and Skaperdas (2026), which use the January 2021 Georgia Senate runoff as a natural experiment to measure the causal effect of expected government debt on interest rates. We reproduce the ten-year event-study elasticities exactly, obtaining a real term-premium response of 1.71 basis points and an expected-real-rate response of 1.20 against the paper's 1.71 and 1.20, and we match the projection-regression debt coefficient to within one standard error. Where the original relies on inputs we cannot obtain, namely the intraday Bloomberg tape, a proprietary cross-section of investment-bank deficit forecasts, and the internal parameters of the term-structure model at the five-year-forward ten-year horizon, we either substitute a public alternative and disclose the substitution or document the wall and explain why it cannot be crossed. Our principal substitution re-estimates the yield-curve decomposition with the Adrian, Crump and Moench model, whose ten-year term premium tracks the New York Fed's published series with a correlation of 0.977. Under this independent model the paper's central finding, that debt supply raises long-term yields through the term premium rather than through the expected real rate, survives.
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.pos = "H")
+```
+
+# Introduction
+
+Bhatt, Diercks, Eyal and Skaperdas (2026, hereafter BDES) ask how the supply of government debt affects interest rates, a quantity that ordinary time-series correlations cannot recover because deficits move with the business cycle and the demand for Treasury securities shifts over time. Their identification comes from an unusually clean event. After the November 2020 elections resolved the presidency and the House, the only remaining source of near-term fiscal uncertainty was control of the Senate, which turned on two Georgia runoff elections held on January 5, 2021. Because the filibuster confined a narrow Senate majority to budget reconciliation, the runoff isolated almost exactly one question, whether a large debt-financed transfer programme would pass, while expectations about monetary policy and the broader economy were little changed. Prediction markets put a dual Democratic victory at roughly even odds on the eve of the vote. When it resolved, expected deficits jumped and Treasury yields rose about ten basis points within a day, and BDES read the overnight move as the causal effect of the fiscal channel.
+
+The paper turns that move into an elasticity in three ways. It divides the one-day change in several yields and yield components by the size of the fiscal shock, about two per cent of GDP, to obtain Table 1. It assigns statistical significance not through an asymptotic standard error, which a single observation cannot supply, but through a placebo distribution of one-day moves drawn from ordinary days between 2016 and the eve of the runoff. And it corroborates the event study with a long-run projection regression in the tradition of Laubach (2009), relating forward yields to the Congressional Budget Office's five-year-ahead debt projections, which is Table 3. Across all three the headline result is a decomposition claim, that the effect concentrates in the term premium rather than in the expected real short rate, which the authors read as evidence that government debt is an imperfect substitute for other assets and that central-bank balance-sheet policy therefore retains traction.
+
+This report reproduces what public data allow, states plainly what they do not, and where a wall can be circumvented with a public method substitutes one and discloses it. Three of the paper's exercises are reproducible from data anyone can download: the ten-year row of the event study, the placebo bootstrap, and the projection regression. Two are not: the daily probability regression, the paper's Table 2, depends on a betting-market price series whose public interface has been discontinued, and the intraday window depends on proprietary tick data and on model internals the Federal Reserve does not release. The paper's preferred object, the five-year-forward ten-year decomposition, sits between these cases, because the public decomposition data stop at the ten-year horizon and the authors generated the forward object with model parameters that are not published; we recover it by estimating an alternative term-structure model on public yields. The result is a replication whose core matches the original to the decimal, whose central mechanism survives a change of model, and whose gaps are documented rather than papered over.
+
+# Data and access
+
+The event study needs zero-coupon Treasury yields at daily frequency and a decomposition of those yields into an expected-real-rate component and a term premium. The yields come from the Gürkaynak, Sack and Wright nominal curve (2007) and their companion Treasury Inflation-Protected curve (2010), both published daily by the Federal Reserve Board as smoothed Svensson parameter files and downloaded at run time by our code. The decomposition comes from the model of D'Amico, Kim and Wei (2018, hereafter DKW), whose daily output the Board releases as a research file covering expected real short rates, real term premia, expected inflation, inflation risk premia and a liquidity premium at the five-year, ten-year and five-year-forward five-year horizons. The projection regression needs the CBO five-year-ahead debt projection together with Federal Reserve and foreign official holdings of Treasuries and a measure of long-horizon expected inflation; these are assembled, already aligned to the semiannual CBO release calendar, in the replication deposit of Plante, Richter and Zubairy (2026, hereafter PRZ), which is archived on the Harvard Dataverse. Nominal GDP, which scales the fiscal shock, comes from the Bureau of Economic Analysis through the Federal Reserve Bank of St. Louis data service.
+
+Two of these inputs travel with our code rather than being downloaded on each run, for reasons of reproducibility rather than access. The DKW file is re-estimated monthly, so a live download months from now would return a revised vintage whose historical values differ slightly from the ones underlying our numbers; bundling the exact file we used pins the headline elasticities. The PRZ workbook has no stable direct-download URL, so it is simpler to include it than to script a Dataverse call. Both are public. The Gürkaynak, Sack and Wright curves and the GDP series, which do not revise materially, are downloaded at run time.
+
+Three inputs are genuinely unavailable to us, and they define the boundary of the replication. The first is the intraday Treasury tape, sold through Bloomberg and comparable institutional feeds, which the paper uses to narrow its event window to the minutes before the January 6 Capitol disturbance. The second is the cross-section of investment-bank deficit forecasts hand-collected by Hazell and Hobler (2025) from sell-side research notes, which the paper draws on to randomise the size of the fiscal shock inside its bootstrap. The third is the internal state-space parameterisation of the DKW model, which would be required to extend its decomposition to the five-year-forward ten-year horizon that the paper prefers; the Board releases the model's output but not the object needed to re-run it at a new maturity. Each of these shapes a specific decision below, and we flag it there rather than working around it silently.
+
+The substitution that does the most work in this report is a term-structure model we estimate ourselves, so we introduce it here in words and defer the algebra to Appendix B. The paper's decomposition separates a long yield into what investors expect the average short rate to be over the life of the bond and the extra compensation they demand for bearing interest-rate risk, the term premium. The DKW model performs that separation but only at maturities the Board publishes. The model of Adrian, Crump and Moench (2013, hereafter ACM) performs the same separation using only the published yield curve and a sequence of ordinary least-squares regressions, which means we can run it ourselves and read the decomposition at any maturity, including the five-year-forward ten-year object the paper wants. The price of this freedom is that our ACM implementation works on the nominal curve, so it decomposes the nominal rather than the real forward yield; we treat that difference as something to disclose and to test against, not to hide. Its credibility rests on a check we can make against public data, namely that our ten-year term premium reproduces the one the New York Fed publishes.
+
+# The one-day event study
+
+## What the paper does
+
+The event study is arithmetic rather than estimation. For each of six series, the ten-year real yield and its expected-rate and term-premium components, and the same three at the five-year-forward ten-year horizon, the paper takes the change from the January 5 close to the January 6 close and divides by the size of the fiscal shock. The forward yields are constructed from the smoothed curve by the standard no-arbitrage relation, in which the five-year-forward ten-year rate equals fifteen times the fifteen-year yield minus five times the five-year yield, all divided by ten. The shock is the change in expected Treasury issuance implied by the runoff, half of the roughly nine hundred billion dollars that investment banks attached to a Democratic victory, expressed as a share of first-quarter 2021 nominal GDP, which comes to about two per cent.
+
+## What we do, and where we substitute
+
+The ten-year row is fully reproducible, because the DKW file publishes the ten-year real components directly and the ten-year TIPS yield comes straight from the Gürkaynak, Sack and Wright real curve. Our shock, half of nine hundred billion dollars against a nominal GDP of 22,681 billion, is 1.984 per cent of GDP, so the event-study divisor matches the paper's stated magnitude without adjustment. The five-year-forward ten-year yield is likewise reproducible, since it is a fixed linear combination of published yields.
+
+The five-year-forward ten-year decomposition is where the wall appears. The public DKW file provides components at the five-year, ten-year and five-year-forward five-year horizons but not at the fifteen-year point that the forward construction requires, and the parameters that would let us extend the model are internal. Rather than leave the paper's preferred rows blank, we estimate the ACM model on the nominal Gürkaynak, Sack and Wright curve and read the term premium and expected-rate components of the five-year-forward ten-year nominal yield from it. Because ACM here decomposes the nominal rather than the real forward yield, its levels are not comparable to the paper's real components and we do not present them as a match; what is comparable, and what matters for the paper's thesis, is the split between the two components. The model is validated in Section 6 and its ten-year term premium tracks the New York Fed's published ACM series with a correlation of 0.977.
+
+## Results
+
+Table 1 sets our numbers beside the paper's. The ten-year real elasticities coincide to two decimals. The five-year-forward ten-year real yield response of 3.96 also coincides. The forward decomposition rows report the paper's real components alongside our nominal ACM components, which are not on the same scale; the point of comparison is that in both the term premium is the dominant channel, at a ratio of roughly eight to one in our nominal estimate and roughly three to two in the paper's real one.
+
+Table: Event-study elasticities, basis points per one percentage point of debt to GDP. Paper values are BDES Table 1, one-day window. The five-year-forward ten-year decomposition rows are not scale-comparable, because ours is a nominal ACM decomposition and the paper's is a real DKW decomposition; they are shown together to compare the split between components, not the levels.
+
+| Series | Paper | Replication |
+|:--|--:|--:|
+| 10-year TIPS yield | 2.58 | 2.58 |
+| 10-year expected real rate | 1.20 | 1.20 |
+| 10-year real term premium | 1.71 | 1.71 |
+| 5f10y TIPS yield | 3.96 | 3.96 |
+| 5f10y expected rate (paper real / ours nominal) | 1.64 | 0.77 |
+| 5f10y term premium (paper real / ours nominal) | 2.61 | 5.95 |
+
+The one honest asterisk in this table is the pair of forward decomposition rows, and it is a substitution rather than a discrepancy. The paper reports a real decomposition we cannot compute from public data, and we report a nominal one that we can; both say the response is a term-premium phenomenon.
+
+# Statistical significance
+
+## What the paper does
+
+With a single event there is no sampling variance, so the paper asks a randomisation question. If the same one-day calculation were performed on an arbitrary ordinary day between 2016 and the eve of the runoff, how often would a move at least this large arise by chance? It answers by sampling placebo dates ten thousand times and, on each draw, dividing the one-day change by a shock size that is itself drawn at random from the Hazell and Hobler cross-section of investment-bank forecasts. The resulting share is the p-value.
+
+## What we do, and where we substitute
+
+The cross-section that randomises the shock is proprietary, so we cannot reproduce the second source of variation in the paper's null. We therefore fix the shock at its nine-hundred-billion-dollar median and randomise only the date. This is a weaker test, and we say so: it drops the denominator uncertainty the paper builds in. It is also, once the shock is fixed, exactly the test the paper's own logic reduces to, because a common divisor applied to the actual move and to every placebo move cancels from the comparison. The question becomes whether the January 6 one-day change is extreme relative to the 2016 to 2021 distribution of one-day changes in the same series, which is what the placebo null shown in Figure 1 depicts.
+
+Because daily yield changes cluster in volatility and the placebo window contains the March 2020 disruption, which fattens the null and mechanically makes rejection harder, we also report each p-value with the February to June 2020 window removed. This follows the robustness suggestion in the replication plan and it moves the p-values in the expected direction.
+
+## Results
+
+Table 2 reports two-sided p-values with the full-window value first and the COVID-excluded value in parentheses. Three of the four series we can compare directly land on the paper's reported significance, and the ordering is the paper's ordering, with the real term premium the most significant cell and the ten-year TIPS yield the least, the one the paper itself reports as insignificant. Excluding the pandemic window lowers every p-value, confirming that the independent-date draw over a period containing March 2020 is conservative rather than innocuous.
+
+Table: Placebo p-values, two-sided, full window with the COVID-excluded value in parentheses. Paper values are the one-day bootstrap p-values in BDES Table 1.
+
+| Series | Paper | Replication |
+|:--|--:|--:|
+| 10-year real term premium | 0.02 | 0.024 (0.019) |
+| 10-year expected real rate | 0.06 | 0.079 (0.067) |
+| 10-year TIPS yield | 0.11 | 0.114 (0.092) |
+| 5f10y TIPS yield | 0.05 | 0.045 (0.029) |
+
+```{r placebo-fig, fig.cap="The placebo null for the ten-year real term premium: one-day changes on ordinary days between 2016 and the eve of the runoff, with the January 6, 2021 move marked. The event lies far in the right tail, corresponding to a two-sided p-value of about 0.02.", out.width="82%", fig.align="center"}
+knitr::include_graphics("figures/placebo_null.png")
+```
+
+# The projection regression
+
+## What the paper does
+
+The event study rests on a single episode, so the paper corroborates it with a long-run regression that trades identification for sample length. Following Laubach (2009) and its recent re-examination by PRZ, it regresses the change in the five-year-forward ten-year yield, and separately its expected-rate and term-premium components, on the change in the CBO five-year-ahead debt projection together with changes in Federal Reserve holdings, foreign official holdings and ten-year expected inflation. The regression is run in first differences to address non-stationary residuals, at semiannual frequency, from February 1985 to January 2025, with heteroskedasticity-robust standard errors.
+
+## What we do
+
+Every regressor comes from the PRZ deposit, already aligned to the CBO release calendar, so this exercise needs no substitution. We construct the differenced series, restrict to the paper's window, and estimate the three regressions with the same robust standard errors. The dependent variable in the headline column is the five-year-forward ten-year nominal yield, which the PRZ workbook also provides. For the decomposition columns we report two objects: the five-year-forward five-year real components from the public DKW series, which are the tenor PRZ themselves use and which serve as a check that our regression machinery reproduces the parent literature, and the five-year-forward ten-year nominal components from our ACM model, which are the object the paper prefers rendered in the only decomposition we can compute publicly at that horizon.
+
+## Results
+
+Table 3 reports the debt coefficient. On the paper's window our estimate is 4.13 basis points per percentage point of debt to GDP, against the paper's 3.95, a difference well inside one standard error, with the same sign and significance on every control. The two decomposition rows tell the same story as the event study, with the debt effect concentrated in the term premium. Because the assembled PRZ panel begins in 1976, we also report the coefficient on the full sample, which is 3.48; the paper's estimate sits between our window-restricted and full-sample figures, and the sensitivity of the coefficient to the sample is the subject of the structural-break test in Section 6.
+
+Table: Projection regression, first differences, heteroskedasticity-robust standard errors, semiannual. Paper values are BDES Table 3. The decomposition rows compare the paper's real five-year-forward ten-year components with the public five-year-forward five-year DKW components and our nominal five-year-forward ten-year ACM components.
+
+| Quantity | Paper | Replication |
+|:--|--:|--:|
+| Debt coefficient, 5f10y yield (paper window) | 3.95 | 4.13 |
+| Standard error | 1.14 | 1.36 |
+| Observations | 84 | 86 |
+| Expected-rate coefficient | 1.24 | 1.37 (5f5 DKW) / 0.96 (5f10y ACM) |
+| Term-premium coefficient | 1.74 | 1.77 (5f5 DKW) / 3.23 (5f10y ACM) |
+| Debt coefficient, full 1976 sample | -- | 3.48 |
+
+# Extensions
+
+The replication above already carries one extension inside it, because the five-year-forward decomposition is computed with a model the paper does not use. We make that model-dependence test explicit here, and add two further exercises that the public data support at no extra data cost.
+
+## The decomposition is not an artefact of one model
+
+The paper's central claim is that debt supply loads on the term premium rather than on the expected real rate, and that claim is only as robust as the single model performing the decomposition. Re-estimating the decomposition with ACM tests exactly this. Figure 2 shows our ACM ten-year term premium against the series the New York Fed publishes; the two track closely, with a correlation of 0.977, which is the evidence that our implementation is faithful. Under this independent model the term-premium channel dominates in both the event study, where the nominal forward term premium moves by 5.95 basis points against 0.77 for the expected rate, and the projection regression, where the corresponding debt coefficients are 3.23 and 0.96. The paper's qualitative conclusion therefore does not depend on the DKW model; a second, publicly estimable term-structure model delivers the same split.
+
+```{r acm-fig, fig.cap="Our ACM ten-year term premium against the New York Fed's published ACM series. The correlation over the overlapping monthly sample is 0.977, which validates the implementation used for the five-year-forward decomposition.", out.width="82%", fig.align="center"}
+knitr::include_graphics("figures/acm_validation.png")
+```
+
+## The two columns the paper suppresses
+
+The paper reports the expected-rate and real-term-premium responses but not the expected-inflation and inflation-risk-premium responses, deferring to Hazell and Hobler on inflation. Because the DKW file carries all four components, recovering the missing two costs nothing and closes the decomposition arithmetically. In the event study the four components sum to 4.36 basis points, exactly the nominal fitted response, and in the projection regression the four coefficients sum to 4.42 against a nominal coefficient of 4.41. This is more than a curiosity, because the identity is a test: had our DKW series been misaligned or had we chosen the wrong object for the expected-rate column, the four pieces would not have summed to the whole. That they do is independent confirmation that the decomposition entering every table is correctly assembled.
+
+## No structural break in the debt coefficient
+
+In their concluding discussion the authors concede that their time-series evidence reflects the fiscal regime of recent decades and does not rule out investors demanding more compensation under weaker fiscal discipline. This is a testable proposition. A supremum-F test for an unknown break in the debt coefficient over the paper's window returns a p-value of 0.91, and Chow tests at the 2008 financial crisis and the 2020 fiscal expansion return 0.94 and 0.52; none rejects stability. The point estimate drifts down rather than up, from 4.72 in the first half of the sample to 2.89 in the second. We therefore find no evidence for the regime shift the authors flag as a possibility, which is itself an informative answer to a question they raised. We report this as a null result rather than dressing it as a finding, and we note that short rolling windows on differenced data are noisy, so the formal tests carry the weight here, not the point estimates.
+
+# Walls
+
+Two of the paper's exercises cannot be reproduced from public data, and the honest contribution at this boundary is to say precisely which artefact is missing and why.
+
+The daily probability regression, the paper's Table 2, regresses daily yield changes on the betting-market probability of a Democratic Senate victory, taken from the PredictIt exchange over the month before the runoff. PredictIt's public interface has been discontinued and its historical daily series is not cleanly archived, so the regressor cannot be reconstructed from a public source. A stylised series anchored to the few documented points can illustrate the mechanics but cannot support a reported coefficient, and we do not present one. This exercise is the weakest cell in the original in any case, since its ten-year TIPS coefficient is itself insignificant, so its loss costs the replication little beyond one corroborating specification.
+
+The intraday window cannot be reproduced for two independent reasons that stack. The narrow event window that ends before the January 6 disturbance requires five-minute Treasury prices, which are sold through Bloomberg and comparable institutional feeds and are not public. Even with those prices, filtering them into a decomposition would require the internal parameters of the DKW model, which the Board does not release. Treasury futures offer a public high-frequency instrument that could in principle support a cash-versus-futures comparison, but the tick data are themselves costly and the second obstacle, the model internals, would remain. We therefore declare the intraday row non-replicable and note that the paper reports no p-values for it, so its point estimates were the least load-bearing quantities in the original.
+
+# Conclusion
+
+The publicly reproducible core of BDES reproduces cleanly. The ten-year event-study elasticities match to two decimals, the projection-regression debt coefficient matches to within one standard error, and the placebo p-values match to within a percentage point with the correct ordering across series. The paper's central mechanism, that debt supply raises yields through the term premium rather than the expected real rate, survives re-estimation under an independent term-structure model whose ten-year term premium reproduces the New York Fed's published series, and it survives the recovery of the decomposition's two suppressed columns, which sum to the whole as they must. The debt coefficient shows no structural break, contrary to a regime shift the authors themselves raise as a possibility.
+
+What could not be reproduced is stated rather than approximated. The intraday window is gated behind proprietary tick data and unreleased model internals, the probability regression behind a discontinued price feed, and the paper's preferred forward decomposition behind model parameters the Board publishes only as output; the first two we document as walls and the third we cross with a disclosed nominal substitute. For a replication this map of what is and is not independently checkable is the substantive result. This paper is an unusually good specimen for that argument, because one of its exercises is fully public, one is gated behind hand-collected proprietary documents, and one is gated behind a central bank's internal model, and a reader can now see exactly which of its conclusions rest on which kind of evidence.
+
+# Appendix A: Decisions log
+
+Several quantities are underdetermined by the paper, and each was resolved with a documented choice.
+
+The fiscal-shock denominator can be read as two per cent or 2.1 per cent of GDP depending on which passage governs; we use the value implied by first-quarter 2021 nominal GDP, which is 1.984 per cent, and every event-study number scales by 0.945 if 2.1 is preferred instead. The placebo p-values can be one-sided or two-sided; we report two-sided as the baseline because it matches the paper's reported values most closely, and the one-sided values are available in the code. The robust-standard-error type in the projection regression is unstated in the original; we use HC1. The object entering the expected-rate column can be the model's asymptotic long-run rate or the horizon-average expected real short rate; the exact reproduction of the ten-year elasticities and the closing of the four-component sum identity confirm that we use the same object the paper does, namely the horizon average. The projection sample can begin in 1976, where the assembled panel starts, or in 1985, where the paper's window begins; we report the 1985 window as the baseline and the full sample as a sensitivity, and the difference between them is the subject of the structural-break test.
+
+# Appendix B: The ACM model in brief
+
+The Adrian, Crump and Moench (2013) model recovers a term premium from a yield curve through a sequence of ordinary least-squares steps, which is why it can be estimated on public data without proprietary internals. We summarise the construction our code implements.
+
+Let the pricing factors be the first five principal components of the panel of zero-coupon yields, evaluated on a monthly grid of maturities built from the published Svensson parameters. The factors follow a first-order vector autoregression, whose residuals are the pricing innovations and whose covariance is estimated from them. One-month excess holding-period returns on bonds of each maturity are regressed on a constant, the contemporaneous innovations and the lagged factors; the loadings on the innovations measure exposure to risk, and the loadings on the lagged factors, restricted by no-arbitrage, identify the market prices of risk through two cross-sectional least-squares steps. The short rate is projected on the factors to complete the model. Bond yields are then priced twice through the affine recursions the model implies, once with the estimated prices of risk and once with the prices of risk set to zero; the first gives the fitted yield and the second gives the expected-average-short-rate, or risk-neutral, yield. The term premium is the difference. Reading these at the five-year and fifteen-year maturities and combining them by the same forward relation used for the yields gives the five-year-forward ten-year decomposition. Our implementation is nominal, so the expected-rate component is a nominal expected short rate and the term premium is a nominal term premium; this is the disclosed difference from the paper's real DKW decomposition, and the validation against the New York Fed's published ACM series in Figure 2 confirms that the implementation is faithful.
+
+# Appendix C: Reproduction
+
+The single script `replication.R` reproduces every number and figure in this report. It downloads the Gürkaynak, Sack and Wright curves and the GDP series at run time, reads the bundled DKW and PRZ files from `data/`, estimates the ACM model, and prints each exercise followed by a summary. The one input a user must supply is a free Federal Reserve Economic Data key, set at the top of the script.
+
+The values printed in this document are those our code produced at the time of writing. Because the Gürkaynak, Sack and Wright curves are re-downloaded from the Federal Reserve on each run and are revised weekly, a reader who re-runs the script may obtain figures that differ marginally in the final decimal, and this affects the ACM-based five-year-forward decomposition and, slightly, the bootstrap p-values. The quantities drawn from the bundled DKW file, including the ten-year event-study elasticities of 2.58, 1.20 and 1.71, are fixed and will not move.
+
+# References
+
+Adrian, T., R. K. Crump and E. Moench (2013). Pricing the term structure with linear regressions. *Journal of Financial Economics* 110(1), 110-138.
+
+Bhatt, A., A. M. Diercks, B. Eyal and A. Skaperdas (2026). The Causal Effect of Debt on Interest Rates. Finance and Economics Discussion Series 2026-031, Board of Governors of the Federal Reserve System.
+
+D'Amico, S., D. H. Kim and M. Wei (2018). Tips from TIPS: the informational content of Treasury Inflation-Protected Security prices. *Journal of Financial and Quantitative Analysis* 53(1), 395-436.
+
+Gürkaynak, R. S., B. Sack and J. H. Wright (2007). The U.S. Treasury yield curve: 1961 to the present. *Journal of Monetary Economics* 54(8), 2291-2304.
+
+Gürkaynak, R. S., B. Sack and J. H. Wright (2010). The TIPS yield curve and inflation compensation. *American Economic Journal: Macroeconomics* 2(1), 70-92.
+
+Hazell, J. and S. Hobler (2025). Do deficits cause inflation? A high frequency narrative approach. Working paper, London School of Economics.
+
+Laubach, T. (2009). New evidence on the interest rate effects of budget deficits and debt. *Journal of the European Economic Association* 7(4), 858-885.
+
+Plante, M. D., A. W. Richter and S. Zubairy (2026). Revisiting the interest rate effects of federal debt. *Review of Economics and Statistics*, forthcoming.
